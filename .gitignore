@@ -1,0 +1,9 @@
+# Code from other researchers
+/JMason_TVBayesController-main/
+/vhdl_code/zafeiropoulos/
+
+# Licence files
+*.dat
+
+# Useless stuff
+/vhdl_code/old/
