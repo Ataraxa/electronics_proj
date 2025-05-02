@@ -7,3 +7,6 @@
 
 # Useless stuff
 /vhdl_code/old/
+
+# Simulation outputs 
+*.vcd
