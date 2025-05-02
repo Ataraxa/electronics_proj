@@ -57,7 +57,8 @@ Port(
 
     -- FTDI interface ports
     data_received : in std_logic_vector(19 downto 0);
-    data_sent : out std_logic_vector(15 downto 0)
+    data_sent : out std_logic_vector(15 downto 0);
+    data2consume : in std_logic
 
     -- -- Base station ports
     -- chip_select_out : out std_logic := '1';
@@ -87,7 +88,7 @@ architecture Behavioral of CORE_MODULE is
     -- Signals related to signal generation 
     type stimulation is (high, low, inter_pulse, waiting, finished);
     signal dbs_state : stimulation;
-    signal state_counter : integer range 0 to 150;
+    signal state_counter : integer range 0 to 7000;
     signal high_dac : std_logic_vector(15 downto 0) := "1001100110011001"; -- +1V
     signal low_dac : std_logic_vector(15 downto 0) := "0110011001100110";
     signal null_dac : std_logic_vector(15 downto 0) := "1000000000000000";
@@ -97,16 +98,17 @@ architecture Behavioral of CORE_MODULE is
     signal waiting_time : integer range 0 to 100 := 99;
 
     -- Signal related to input data reading and reprogrammation
-    signal data2consume : std_logic := '0';
-    signal header : std_logic_vector(3 downto 0);
-    signal message : std_logic_vector(15 downto 0);
+    -- signal header : std_logic_vector(3 downto 0);
+    -- signal message : std_logic_vector(15 downto 0);
+    signal reset : std_logic := '0';
     
     -- Signal related to control policy
     type control_policy is (phase_locked, on_off, amplitude_prop);
     signal selected_policy : control_policy := on_off;
     type policy_state is (is_on, is_off, delaying);
     signal control_state : policy_state := is_on;
-    signal multipurpose_trigger : std_logic := '0'; -- 2 is should update high, 1 is ignore, 0 is update low
+    signal is_delaying : std_logic := '0';
+    signal target_state : std_logic := '1'; -- 2 is should update high, 1 is ignore, 0 is update low
     signal on_off_state : std_logic := '1';
     signal phase_delay_counter : integer range 0 to 10_000_000 := 0;
     signal phase_delay_cycles : integer range 0 to 10_000_000 := 10_000; 
@@ -119,6 +121,16 @@ architecture Behavioral of CORE_MODULE is
         begin
         if rising_edge(master_clock) then 
 
+            if (reset = '1') then 
+                adc_cs_counter <= 0;
+                dac_clock_counter <= 0;
+                delay_counter <= 0;
+
+                adc_cs_internal <= '0';
+                dac_clock_internal <= '0';
+                should_delay <= '0';
+                is_stimulating <= '0';
+            end if;
             --- Generate the ADC clock by a clock divider
             if (adc_cs_counter = adc_cs_divider-1) then 
                 if (adc_cs_internal = '0') then 
@@ -157,7 +169,11 @@ architecture Behavioral of CORE_MODULE is
     PULSE_GEN : process(master_clock)
         begin 
         if rising_edge(master_clock) then
-            if (is_stimulating = '1') and (on_off_state = '1') then 
+            if (reset = '1') then
+                report("gonna reset!");
+                dbs_state <= waiting;
+                state_counter <= 0;
+            elsif (is_stimulating = '1') and (on_off_state = '1') then 
                 case dbs_state is 
                     when high => 
                         if (state_counter = high_time) then
@@ -166,6 +182,8 @@ architecture Behavioral of CORE_MODULE is
                         else 
                             data_dac <= high_dac;
                             data_dac_valid <= '1';
+                            -- if (state_counter + 1 > )
+                            -- report(integer'image(high_time));
                             state_counter <= state_counter + 1;
                         end if;
 
@@ -200,17 +218,21 @@ architecture Behavioral of CORE_MODULE is
 
                 end case;
             else
+                data_dac <= null_dac;
                 dbs_state <= waiting;
             end if;
         end if;
     end process PULSE_GEN;
 
     REPROG : process(master_clock)
+    variable header : std_logic_vector(3 downto 0);
+    variable message : std_logic_vector(15 downto 0);
     begin 
         if rising_edge(master_clock) then 
             if (data2consume = '1') then 
-                header <= data_received(19 downto 16);
-                message <= data_received(15 downto 0);
+                reset <= '1';
+                header := data_received(19 downto 16);
+                message := data_received(15 downto 0);
                 
                 -- Use header to select which variable to update
                 case header is
@@ -226,67 +248,85 @@ architecture Behavioral of CORE_MODULE is
 
                     -- Control policy, starting with a 1
                     when "1111" => -- toggle on/off state
-                        if (to_integer(unsigned(message)) = 0) then 
-                            multipurpose_trigger <= 0;
+                        if (message = "0000000000000000") then 
+                            target_state <= '0';
                         else
-                            multipurpose_trigger <= 2;
+                            target_state <= '1';
                         end if;
+
+                    when "1110" => 
+                        case to_integer(unsigned(message)) is
+                            when 1 => selected_policy <= on_off;
+                            when 2 => selected_policy <= phase_locked;
+                            when 3 => selected_policy <= amplitude_prop;
+                            when others => null;
+                        end case;
 
                     when others => null;  -- Undefined headers do nothing
                 end case;
                 
-                data2consume <= '0';  -- Clear the consume flag
+                -- data2consume <= '0';  -- Clear the consume flag
+            else 
+                -- if phase_locked policy, need to reset the trigger when no event detected
+                if (selected_policy = phase_locked) then 
+                    target_state <= '0';
+                end if;
+
+                reset <= '0';
             end if;
         end if;
     end process REPROG;
 
-    ON_OFF_CONTROL: process(master_clock, multipurpose_trigger)
+    ON_OFF_CONTROL: process(master_clock, target_state)
     begin 
-        if rising_edge(master_clock) then 
-            if rising_edge(multipurpose_trigger) then 
-                case selected_policy is
-                    when on_off =>
-                        control_state <= is_on;
-                        on_off_state <= '1';
-                    
-                    when phase_locked =>
-                        control_state <= delaying;
-                        phase_delay_counter <= phase_delay_counter + 1;
-
-                    when others => null;
-                end case;
-
-            elsif falling_edge(multipurpose_trigger) then
-                if (selected_policy = on_off) then 
-                    control_state <= is_off;
+        if rising_edge(target_state) then 
+            -- Rising edge detected
+            case selected_policy is
+                when on_off =>
+                    on_off_state <= '1';
+                
+                when phase_locked =>
+                    is_delaying <= '1';
                     on_off_state <= '0';
-                end if;
+                    phase_delay_counter <= 0;  -- Reset counter on trigger
 
-            else 
-                if (state = delaying) then 
-                    if (phase_delay_counter = phase_delay_cycles) then 
-                        control_policy <= is_on;
-                        phase_delay_counter <= 0;
-                    else 
-                        phase_delay_counter <= phase_delay_counter + 1;
-                    end if;
-                end if;
-
-                if (state = is_on) and (selected_policy = phase_locked) then
-                    if (trigger_time_counter = trigger_time_cycles) then 
-                        control_policy <= is_off;
-                        trigger_time_counter <= 0;
-                    else 
-                        trigger_time_counter <= trigger_time_counter + 1;
-                    end if;
-                end if; 
-            end if;
-            
-            case control_state is
-                when is_on => on_off_state <= '1';
-                when is_off => on_off_state <= '0'; 
-                when delaying => on_off_state <= '0';
+                when others => null;
             end case; 
+ 
+            -- elsif (target_state = '0') then
+            --     -- Falling edge detected
+            --     if (selected_policy = on_off) then 
+            --         on_off_state <= '0';
+            --     end if;
+            -- end if;
+        elsif falling_edge(target_state) then
+            if (selected_policy = on_off) then 
+                on_off_state <= '0';
+            end if;
+        end if;
+
+        if rising_edge(master_clock) then
+            -- Synchronize external trigger to clock domain
+            -- if (data2consume = '1') then   
+
+
+            -- Delay logic (phase_locked policy)
+            if (is_delaying = '1') then 
+                if (phase_delay_counter = phase_delay_cycles) then 
+                    on_off_state <= '1';
+                    is_delaying <= '0';
+                    phase_delay_counter <= 0;
+                else 
+                    phase_delay_counter <= phase_delay_counter + 1;
+                end if;
+            elsif (on_off_state = '1') and (selected_policy = phase_locked) then
+                if (trigger_time_counter = trigger_time_cycles) then 
+                    on_off_state <= '0';
+                    trigger_time_counter <= 0;
+                else 
+                    trigger_time_counter <= trigger_time_counter + 1;
+                end if;
+            end if;
         end if;
     end process ON_OFF_CONTROL;            
 
