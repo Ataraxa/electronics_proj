@@ -1,0 +1,4 @@
+v 4
+file . "core_module.vhdl" "0d8b5984e15cf8fe59264bd799034d6cf15cb4c1" "20250426084012.922":
+  entity core_module at 34( 1323) + 0 on 11;
+  architecture behavioral of core_module at 70( 2354) + 0 on 12;
