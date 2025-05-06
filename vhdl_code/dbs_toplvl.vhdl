@@ -2,7 +2,7 @@ library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 
-entity toplvl is 
+entity TOP_LEVEL is 
     Port(
         --- ADC interface ports
         data_in_adc : in std_logic;
@@ -24,9 +24,9 @@ entity toplvl is
         --- System ports
         master_clock : in std_logic
     );
-end toplvl;
+end TOP_LEVEL;
 
-architecture Structure of toplvl is
+architecture Structure of TOP_LEVEL is
     --- Internal connection signals
     signal chip_select_core2adc : std_logic;
     signal data_adc2core : std_logic_vector(15 downto 0);

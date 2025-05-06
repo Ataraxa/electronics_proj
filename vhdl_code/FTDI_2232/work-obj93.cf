@@ -1,0 +1,10 @@
+v 4
+file . "ftdi_testbench.vhdl" "188dac5235a96c2d8e4411cf8943ccfff38b2fad" "20250506155449.502":
+  entity ftdi_module_testbench at 1( 0) + 0 on 301;
+  architecture testbench_arch of ftdi_module_testbench at 8( 137) + 0 on 302;
+file . "ftdi_module.vhdl" "474bb23f06ee0a53ed21b77220fdb600f5d7b57b" "20250506155449.117":
+  entity ftdi_2232_rx at 1( 0) + 0 on 299;
+  architecture behaviour of ftdi_2232_rx at 19( 451) + 0 on 300;
+file . "utils.vhdl" "10fa95e69080e26378464a22a8b5e1e7a7c81fac" "20250506111939.921":
+  package utils at 1( 0) + 0 on 49 body;
+  package body utils at 8( 152) + 0 on 50;
