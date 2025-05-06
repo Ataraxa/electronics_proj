@@ -40,7 +40,10 @@ Generic(
     -- can decalre generic variables here
     f_samp : integer := 2_000; 
     f_master_clock : integer := 12_000_000; -- 12 MHz on P7
-    f_serial_clk : integer := 3_000_000
+    f_serial_clk : integer := 3_000_000;
+
+    -- constant related to FTDI 2232 module
+    identifier : std_logic_vector := x"00"
 );
 Port(
     -- System ports
@@ -69,9 +72,7 @@ Port(
 end CORE_MODULE;
 
 architecture Behavioral of CORE_MODULE is
-    
-    signal sensor_data : std_logic_vector(15 downto 0);
-    
+        
     constant adc_cs_divider : integer := f_master_clock/f_samp;
     signal adc_cs_counter : integer range 0 to adc_cs_divider := 0;
     signal adc_cs_internal : std_logic := '1';
@@ -98,15 +99,11 @@ architecture Behavioral of CORE_MODULE is
     signal waiting_time : integer range 0 to 100 := 99;
 
     -- Signal related to input data reading and reprogrammation
-    -- signal header : std_logic_vector(3 downto 0);
-    -- signal message : std_logic_vector(15 downto 0);
     signal reset : std_logic := '0';
     
     -- Signal related to control policy
     type control_policy is (phase_locked, on_off, amplitude_prop);
     signal selected_policy : control_policy := on_off;
-    type policy_state is (is_on, is_off, delaying);
-    signal control_state : policy_state := is_on;
     signal is_delaying : std_logic := '0';
     signal target_state : std_logic := '1'; -- 2 is should update high, 1 is ignore, 0 is update low
     signal on_off_state : std_logic := '1';
