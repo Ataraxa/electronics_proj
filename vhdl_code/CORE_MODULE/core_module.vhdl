@@ -58,7 +58,6 @@ Port(
 
     -- FTDI interface ports
     data_received : in std_logic_vector(19 downto 0);
-    data_sent : out std_logic_vector(15 downto 0);
     data2consume : in std_logic
 );
 end CORE_MODULE;
@@ -80,6 +79,7 @@ architecture Behavioral of CORE_MODULE is
     signal delay_counter : integer range 0 to 100 := 0;
     signal should_delay : std_logic := '0';
     signal should_start : std_logic := '1';
+    signal should_recalculate : std_logic := '1';
 
     -- Signals related to signal generation 
     type stimulation is (high, low, inter_pulse, waiting, recovery);
@@ -275,9 +275,7 @@ architecture Behavioral of CORE_MODULE is
                 end case;
 
                 if (header /= "1111") and (header /= "1110") then -- need to recalculate all timings
-                    total_stim_period := high_time + inter_pulse_time + low_time + recovery_time;
-                    adc_cs_master_cycles <= total_stim_period;
-                    dac_cs_cycles <= f_master_clock / (stim_f * total_stim_period);
+                    should_recalculate <= '1';
                 end if;
                 
                 -- data2consume <= '0';  -- Clear the consume flag
@@ -288,6 +286,14 @@ architecture Behavioral of CORE_MODULE is
                 end if;
 
                 reset <= '0';
+            end if;
+
+            if (should_recalculate = '1') then 
+                report("Gonna recalculate timings!");
+                total_stim_period := high_time + inter_pulse_time + low_time + recovery_time;
+                adc_cs_master_cycles <= total_stim_period;
+                dac_cs_cycles <= f_master_clock / (stim_f * total_stim_period);
+                should_recalculate <= '0';
             end if;
         end if;
     end process REPROG;

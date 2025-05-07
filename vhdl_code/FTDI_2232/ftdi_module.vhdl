@@ -105,7 +105,7 @@ begin
         end if;
     end process;
 
-    BUFFER_MANAGER: process(uart_rx_data_valid)
+    BUFFER_MANAGER: process(uart_rx_data_valid, master_clock)
     variable start_index : integer range 0 to 23;
     variable buffer_3byte : std_logic_vector(23 downto 0) := (others => '0');
     begin
@@ -120,7 +120,7 @@ begin
                 data_received <= buffer_3byte(23 downto 4);
                 data_valid <= '1';
             end if;
-        else
+        elsif rising_edge(master_clock) then
             data_valid <= '0';
         end if;
     end process;

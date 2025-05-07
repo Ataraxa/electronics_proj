@@ -28,16 +28,20 @@ signal dac_ldac : std_logic := '0';
 signal dac_chip_select : std_logic := '1';
 signal dac_serial_clock : std_logic := '1';
 signal dac_sdi : std_logic := '0'; 
+constant CLK_PERIOD   : time := 83.33 ns;
+constant BAUD_PERIOD  : time := 1.667 us;
 
 -- Interface with FTDI ports
 signal spi_data : std_logic_vector(15 downto 0) := (others => '0');
 signal spi_data_valid : std_logic := '0';
-signal usb_input: std_logic;
+signal usb_input: std_logic := '1';
 signal usb_input_valid : std_logic := '0';
 
 signal clock_12MHz : std_logic := '0';
 constant clock_12MHz_period : time := 83.333 ns;
 signal test_complete : boolean := false;
+signal expected_data : std_logic_vector(19 downto 0) := (others => '0');
+
 begin 
     uut: entity work.TOP_LEVEL
         port map (
@@ -68,18 +72,18 @@ begin
 
     LFP_GENERATOR: process
         begin 
-        for i in lfp_data_array'range loop
-            lfp_data <= lfp_data_array(i);
-            wait for 500 us;
+        while not test_complete loop 
+            for i in lfp_data_array'range loop
+                exit when test_complete;
+                lfp_data <= lfp_data_array(i);
+                wait for 500 us;
+            end loop;
         end loop;
-        wait for 30 ms;
-        test_complete <= true;
-        report("Simulation complete!");
-        wait;
     end process LFP_GENERATOR;
 
     ADC_CHIP_SIMULATOR: process
     begin 
+    while not test_complete loop
         wait until falling_edge(adc_cs);
         -- report("ADC conversion initiated!");
 
@@ -93,9 +97,49 @@ begin
         end loop;
         wait until falling_edge(adc_sclk);
         adc_data <= 'Z';
-
+    end loop;
         -- report("ADC conversion done!");
     end process ADC_CHIP_SIMULATOR;
+
+    USB_INPUT_GENERATOR: process
+        -- variable data : std_logic_vector(19 downto 0);
+        procedure send_uart_byte(data : std_logic_vector(7 downto 0)) is
+        begin
+            -- Start bit
+            usb_input <= '0';
+            wait for BAUD_PERIOD;
+            
+            -- Data bits (LSB first)
+            for i in 7 downto 0 loop
+                usb_input <= data(i);
+                wait for 1 ns;
+                wait for BAUD_PERIOD - 1 ns;
+            end loop;
+            
+            -- Stop bit
+            usb_input <= '1';
+            wait for BAUD_PERIOD;
+        end procedure;
+
+        procedure send_20bit(data : std_logic_vector(19 downto 0)) is
+            begin
+                expected_data <= data;
+    
+                -- Send as 3 bytes: [header(4)+MSB(4)] [mid byte] [LSB]
+                send_uart_byte(data(19 downto 12));
+                send_uart_byte(data(11 downto 4));
+                send_uart_byte(data(3 downto 0) & "0000");
+                wait for BAUD_PERIOD*4;  -- Inter-packet delay
+            end procedure;
+
+        begin
+        wait for 15 ms;
+        send_20bit("0010" & x"0960");
+        wait for 20 ms;
+        test_complete <= true;
+        report("Simulation complete!");
+        -- wait;
+    end process USB_INPUT_GENERATOR;
 
 end architecture testbench_arch;
     
