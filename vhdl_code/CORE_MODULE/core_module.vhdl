@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------------------
 -- Company: Drakakis Lab 
--- Engineer: 
+-- Engineer: Alexandre Péré
 -- 
 -- Create Date:    14:03:41 12/04/2020 
 -- Design Name: 
@@ -38,7 +38,7 @@ use IEEE.numeric_std.all;
 entity CORE_MODULE is 
 Generic(
     -- can decalre generic variables here
-    f_samp : integer := 2_000; 
+    f_samp : integer := 3_000; 
     f_master_clock : integer := 12_000_000; -- 12 MHz on P7
     f_serial_clk : integer := 3_000_000;
 
@@ -55,48 +55,45 @@ Port(
 
     -- ADC ports
     chip_select_adc : out std_logic := '1';
-    data_out_adc : in std_logic_vector(15 downto 0) := (others => '0');
-    data_out_valid_adc : in std_logic := '0';
 
     -- FTDI interface ports
     data_received : in std_logic_vector(19 downto 0);
     data_sent : out std_logic_vector(15 downto 0);
     data2consume : in std_logic
-
-    -- -- Base station ports
-    -- chip_select_out : out std_logic := '1';
-    -- mosi_out : out std_logic := '0';
-    -- miso_out : in std_logic := 0;
-    -- sclk_out : out std_logic := '0'
 );
 end CORE_MODULE;
 
 architecture Behavioral of CORE_MODULE is
-        
-    constant adc_cs_divider : integer := f_master_clock/f_samp;
-    signal adc_cs_counter : integer range 0 to adc_cs_divider := 0;
+    
+    -- Signals related to clock synchronisation
+    signal adc_cs_master_cycles : integer range 0 to 6_000 := 2880; -- approx 2.86 kHz sampling freq.
+    signal adc_cs_counter : integer range 0 to 20_000 := 0;
     signal adc_cs_internal : std_logic := '1';
-
-    -- Signals related to DAC 
-    constant dac_divider : integer := 1; -- Effectively the number of ADC rising edges before trigger
-    signal dac_clock_counter : integer range 0 to dac_divider+1 := 0;
+    signal dac_cs_cycles : integer range 0 to 100 := 22; -- Effectively the number of ADC rising edges before trigger
+    signal dac_clock_counter : integer range 0 to 100 := 0;
     signal dac_clock_internal : std_logic := '0';
-    signal is_stimulating : std_logic := '0';
+    signal dac_master_clock_cycles : integer range 0 to 262_000;
+    
+    -- Signals related to DAC 
+    -- signal is_stimulating : std_logic := '0';
     signal delay_cycles : integer range 0 to 100 := 50;
     signal delay_counter : integer range 0 to 100 := 0;
     signal should_delay : std_logic := '0';
+    signal should_start : std_logic := '1';
 
     -- Signals related to signal generation 
-    type stimulation is (high, low, inter_pulse, waiting, finished);
+    type stimulation is (high, low, inter_pulse, waiting, recovery);
     signal dbs_state : stimulation;
     signal state_counter : integer range 0 to 7000;
     signal high_dac : std_logic_vector(15 downto 0) := "1001100110011001"; -- +1V
     signal low_dac : std_logic_vector(15 downto 0) := "0110011001100110";
     signal null_dac : std_logic_vector(15 downto 0) := "1000000000000000";
-    signal high_time : integer range 0 to 7000 := 50;
-    signal low_time : integer range 0 to 7000 := 50;
-    signal inter_pulse_time : integer range 0 to 7000 := 50;
-    signal waiting_time : integer range 0 to 100 := 99;
+    signal high_time : integer range 0 to 7000 := 1200; -- 100 µs
+    signal low_time : integer range 0 to 7000 := 1200; -- 100 µs
+    signal inter_pulse_time : integer range 0 to 7000 := 240; -- 20 µs
+    signal recovery_time : integer range 0 to 7000 := 240;
+    signal stim_f : integer range 1 to 250 := 130; -- in Hertz
+    -- signal debug_state : integer range 0 to 10;
 
     -- Signal related to input data reading and reprogrammation
     signal reset : std_logic := '0';
@@ -104,7 +101,7 @@ architecture Behavioral of CORE_MODULE is
     -- Signal related to control policy
     type control_policy is (phase_locked, on_off, amplitude_prop);
     signal selected_policy : control_policy := on_off;
-    signal is_delaying : std_logic := '0';
+    signal is_phase_delaying : std_logic := '0';
     signal target_state : std_logic := '1'; -- 2 is should update high, 1 is ignore, 0 is update low
     signal on_off_state : std_logic := '1';
     signal phase_delay_counter : integer range 0 to 10_000_000 := 0;
@@ -126,51 +123,57 @@ architecture Behavioral of CORE_MODULE is
                 adc_cs_internal <= '0';
                 dac_clock_internal <= '0';
                 should_delay <= '0';
-                is_stimulating <= '0';
             end if;
             --- Generate the ADC clock by a clock divider
-            if (adc_cs_counter = adc_cs_divider-1) then 
-                if (adc_cs_internal = '0') then 
-                    -- If ADC clock on rising edge, increment DAC clock counter
+            if (adc_cs_counter = adc_cs_master_cycles) then 
+                if (adc_cs_internal = '1') then 
+                    -- If ADC clock on falling edge, increment DAC clock counter
                     dac_clock_counter <= dac_clock_counter + 1;
                 end if;
                 adc_cs_internal <= not adc_cs_internal;
                 adc_cs_counter <= 0;
             else 
-                adc_cs_counter <= adc_cs_counter + 1;
+                adc_cs_counter <= adc_cs_counter + 2;
             end if;
 
-            if (dac_clock_counter = dac_divider) then 
+            if (dac_clock_counter = dac_cs_cycles) then 
                 dac_clock_internal <= not dac_clock_internal;
                 dac_clock_counter <= 0;
                 should_delay <= '1';
                 delay_counter <= delay_counter + 1;
+            else
+                should_start <= '0';
             end if;
 
             if (should_delay = '1') then 
                 if (delay_counter = delay_cycles) then 
                     delay_counter <= 0;
-                    is_stimulating <= '1';
+                    should_start <= '1';
+                    should_delay <= '0';
                 else 
                     delay_counter <= delay_counter + 1;
                 end if;
-            end if;
-
-            if (dbs_state = finished) and (is_stimulating = '1') then 
-                is_stimulating <= '0';
             end if;
         end if;
     end process CLOCK_SYNC;
     chip_select_adc <= adc_cs_internal; 
 
     PULSE_GEN : process(master_clock)
-        begin 
+    variable is_stimulating : std_logic := '0';
+    begin 
         if rising_edge(master_clock) then
             if (reset = '1') then
                 report("gonna reset!");
                 dbs_state <= waiting;
                 state_counter <= 0;
-            elsif (is_stimulating = '1') and (on_off_state = '1') then 
+                is_stimulating := '0';
+            elsif (should_start = '1') then 
+                is_stimulating := '1';
+                dbs_state <= high;
+                state_counter <= 0;
+            end if;
+
+            if (is_stimulating = '1') and (on_off_state = '1') then 
                 case dbs_state is 
                     when high => 
                         if (state_counter = high_time) then
@@ -200,19 +203,26 @@ architecture Behavioral of CORE_MODULE is
                     when low => 
                         if (state_counter = low_time) then 
                             state_counter <= 0;
-                            dbs_state <= finished;
+                            dbs_state <= recovery;
                         else 
                             data_dac <= low_dac;
                             data_dac_valid <= '1';
                             state_counter <= state_counter + 1;
                         end if;
 
-                    when finished => 
-                        data_dac <= null_dac;
+                    when recovery => 
+                        if (state_counter = recovery_time) then 
+                            state_counter <= 0;
+                            dbs_state <= waiting;
+                            is_stimulating := '0';
+                        else 
+                            data_dac <= null_dac;
+                            data_dac_valid <= '1';
+                            state_counter <= state_counter + 1;
+                        end if;
 
                     when waiting =>
                         dbs_state <= high;
-
                 end case;
             else
                 data_dac <= null_dac;
@@ -224,6 +234,7 @@ architecture Behavioral of CORE_MODULE is
     REPROG : process(master_clock)
     variable header : std_logic_vector(3 downto 0);
     variable message : std_logic_vector(15 downto 0);
+    variable total_stim_period : integer range 1 to 12_000; -- max stim period is 1 ms, including recovery 
     begin 
         if rising_edge(master_clock) then 
             if (data2consume = '1') then 
@@ -242,6 +253,7 @@ architecture Behavioral of CORE_MODULE is
                     when "0011" => low_time <= to_integer(unsigned(message));
                     when "0100" => inter_pulse_time <= to_integer(unsigned(message));
                     when "0101" => delay_cycles <= to_integer(unsigned(message));
+                    when "0110" => recovery_time <= to_integer(unsigned(message));
 
                     -- Control policy, starting with a 1
                     when "1111" => -- toggle on/off state
@@ -261,6 +273,12 @@ architecture Behavioral of CORE_MODULE is
 
                     when others => null;  -- Undefined headers do nothing
                 end case;
+
+                if (header /= "1111") and (header /= "1110") then -- need to recalculate all timings
+                    total_stim_period := high_time + inter_pulse_time + low_time + recovery_time;
+                    adc_cs_master_cycles <= total_stim_period;
+                    dac_cs_cycles <= f_master_clock / (stim_f * total_stim_period);
+                end if;
                 
                 -- data2consume <= '0';  -- Clear the consume flag
             else 
@@ -273,7 +291,7 @@ architecture Behavioral of CORE_MODULE is
             end if;
         end if;
     end process REPROG;
-
+    
     ON_OFF_CONTROL: process(master_clock, target_state)
     begin 
         if rising_edge(target_state) then 
@@ -283,7 +301,7 @@ architecture Behavioral of CORE_MODULE is
                     on_off_state <= '1';
                 
                 when phase_locked =>
-                    is_delaying <= '1';
+                    is_phase_delaying <= '1';
                     on_off_state <= '0';
                     phase_delay_counter <= 0;  -- Reset counter on trigger
 
@@ -308,10 +326,10 @@ architecture Behavioral of CORE_MODULE is
 
 
             -- Delay logic (phase_locked policy)
-            if (is_delaying = '1') then 
+            if (is_phase_delaying = '1') then 
                 if (phase_delay_counter = phase_delay_cycles) then 
                     on_off_state <= '1';
-                    is_delaying <= '0';
+                    is_phase_delaying <= '0';
                     phase_delay_counter <= 0;
                 else 
                     phase_delay_counter <= phase_delay_counter + 1;

@@ -1,7 +1,6 @@
 library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
-
 entity TOP_LEVEL is 
     Port(
         --- ADC interface ports
@@ -11,15 +10,15 @@ entity TOP_LEVEL is
 
         --- DAC interface ports
         ldac : out std_logic := '0';
-        chip_select : out std_logic := '1';
-        serial_clock : out std_logic := '1';
+        chip_select_dac : out std_logic := '1';
+        serial_clock_dac : out std_logic := '1';
         sdi : out std_logic := '0';
 
-        --- USB interface ports
-        chip_select_out : out std_logic := '1';
-        mosi_out : out std_logic := '0';
-        miso_out : in std_logic := 0;
-        sclk_out : out std_logic := '0';
+        --- FTDI interface ports
+        spi_data : out std_logic_vector(15 downto 0) := (others => '0');
+        spi_data_valid : out std_logic := '0';
+        usb_input : in std_logic;
+        usb_input_valid : in std_logic := '0';
         
         --- System ports
         master_clock : in std_logic
@@ -35,86 +34,29 @@ architecture Structure of TOP_LEVEL is
     signal data_core2dac : std_logic_vector(15 downto 0);
     signal data_valid_core2dac :std_logic;
 
-    component CORE_MODULE
-        Port(
-            -- System ports
-            master_clock : in std_logic;
-
-            -- DAC ports
-            data_dac : out std_logic_vector(15 downto 0) := (others => '0');
-            data_dac_valid : std_logic := '0';
-
-            -- ADC ports
-            chip_select_adc : out std_logic := '1';
-            data_out_adc : in std_logic_vector;
-            data_out_valid_adc : in std_logic_vector;
-
-            -- Base station ports
-            chip_select_out : out std_logic := '1';
-            mosi_out : out std_logic := '0';
-            miso_out : in std_logic := 0;
-            sclk_out : out std_logic := '0'
-        );
-    end component;
-
-    component ADC_161S_MODULE
-        Port(
-            -- System ports
-            master_clock : in std_logic; -- on-board oscillator is 12MHz
-            cs_clock_external : in std_logic;
-
-            -- ADC ports
-            data_in : in std_logic;
-            chip_select : out std_logic := '1';
-            serial_clock : out std_logic := '1';
-
-            -- USB module ports
-            data_out : out std_logic_vector(15 downto 0) := (others => '0');
-            data_out_valid_flag : out std_logic := '0'
-        );
-    end component;
-
-    component DAC_8831_MODULE
-        Port(
-            -- System ports
-            master_clock : in std_logic;
-
-            -- DAC ports
-            ldac : out std_logic := '0';
-            chip_select : out std_logic := '1';
-            serial_clock : out std_logic := '1';
-            sdi : out std_logic := '0';
-
-            -- Ports from processing unit
-            data_in : in std_logic_vector(15 downto 0);
-            data_in_valid : in std_logic := '0'
-        );
-    end component;
+    signal data_ftdi2core : std_logic_vector(19 downto 0);
+    signal data_valid_ftdi2core : std_logic;
 
     begin 
 
-    CORE: CORE_MODULE
+    CORE: entity work.CORE_MODULE
         port map(
             -- System ports
             master_clock => master_clock,
 
             -- DAC ports
-            data_dac => data_core2dac
-            data_dac_valid => data_valid_core2dac
+            data_dac => data_core2dac,
+            data_dac_valid => data_valid_core2dac,
 
             -- ADC ports
             chip_select_adc => chip_select_core2adc,
-            data_out_adc => data_adc2core,
-            data_out_valid_adc => data_valid_adc2core,
 
             -- Base station ports
-            chip_select_out => chip_select_out,
-            mosi_out => mosi_out,
-            miso_out => miso_out,
-            sclk_out => sclk_out
+            data_received => data_ftdi2core,
+            data2consume => data_valid_ftdi2core
         );
 
-    ADC: ADS_161S_MODULE
+    ADC: entity work.ADC_161S_MODULE
         port map(
             -- System ports
             master_clock => master_clock,
@@ -125,20 +67,20 @@ architecture Structure of TOP_LEVEL is
             chip_select => chip_select_adc,
             serial_clock => serial_clock_adc,
 
-            -- Core module ports
-            data_out => data_adc2core,
-            data_out_valid_flag => data_valid_adc2core
+            -- Output ports
+            data_out => spi_data,
+            data_out_valid_flag => spi_data_valid
         );
 
-    DAC: DAC_8831_MODULE 
+    DAC: entity work.DAC_8831_MODULE 
         port map(
             -- System ports
             master_clock => master_clock,
 
             -- DAC ports
             ldac => ldac,
-            chip_select => chip_select,
-            serial_clock => serial_clock,
+            chip_select => chip_select_dac,
+            serial_clock => serial_clock_dac,
             sdi => sdi,
 
             -- Ports from processing unit
@@ -146,6 +88,20 @@ architecture Structure of TOP_LEVEL is
             data_in_valid => data_valid_core2dac
         );
     
+        FTDI: entity work.FTDI_2232_RX
+            port map(
+                -- System ports
+                master_clock => master_clock,
+
+                -- Receiving ports from USB module
+                FTDI_RX => usb_input,
+                FTDI_CTS => usb_input_valid,
+
+                -- Ports to core logic module
+                data_received => data_ftdi2core,
+                data_valid => data_valid_ftdi2core
+            );
+
     --- Additional Logic
 
 end Structure;

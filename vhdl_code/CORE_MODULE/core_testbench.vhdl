@@ -18,8 +18,8 @@ component CORE_MODULE
 
         -- ADC ports
         chip_select_adc : out std_logic := '1';
-        data_out_adc : in std_logic_vector(15 downto 0);
-        data_out_valid_adc : in std_logic;
+        -- data_out_adc : in std_logic_vector(15 downto 0);
+        -- data_out_valid_adc : in std_logic;
 
         -- FTDI interface ports
         data_received : in std_logic_vector(19 downto 0);
@@ -30,8 +30,8 @@ end component;
 
 --- Ports mimicking the ADC interface module
 signal chip_select_adc : std_logic := '1';
-signal data_out_adc : std_logic_vector(15 downto 0) := (others => '0');
-signal data_out_valid_adc : std_logic;
+-- signal data_out_adc : std_logic_vector(15 downto 0) := (others => '0');
+-- signal data_out_valid_adc : std_logic;
 
 --- Ports mimicking the DAC interface module
 signal data_dac : std_logic_vector(15 downto 0) := (others => '0');
@@ -59,8 +59,8 @@ begin
 
             -- ADC ports
             chip_select_adc => chip_select_adc,
-            data_out_adc => data_out_adc,
-            data_out_valid_adc => data_dac_valid,
+            -- data_out_adc => data_out_adc,
+            -- data_out_valid_adc => data_dac_valid,
 
             -- FTDI interface ports
             data_received => data_received,

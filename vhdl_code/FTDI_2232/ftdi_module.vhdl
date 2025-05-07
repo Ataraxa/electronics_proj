@@ -110,7 +110,7 @@ begin
     variable buffer_3byte : std_logic_vector(23 downto 0) := (others => '0');
     begin
         if rising_edge(uart_rx_data_valid) then
-            report(integer'image(8*buffer_counter-1));
+            -- report(integer'image(8*buffer_counter-1));
             start_index := 8*buffer_counter-1;
             buffer_3byte(start_index downto start_index - 7) := uart_rx_reg;
             buffer_counter <= buffer_counter - 1;

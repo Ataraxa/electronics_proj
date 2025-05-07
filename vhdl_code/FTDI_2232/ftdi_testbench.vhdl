@@ -87,16 +87,36 @@ begin
 
     begin
         report("Starting simulation");
-        wait for 100 ns;
+        wait for 10 ns;
         
         -- Test case 1: Change variable 5 (header=0101) to xABCD
+        report("Sending xABCD");
         send_20bit("0101" & x"ABCD");
         
-        wait for 200 ns;
+        wait for 20 ns;
         
         -- Test case 2: Change variable 2 (header=0010) to x1234
+        report("Sending x1234");
         send_20bit("0010" & x"1234");
+
+        wait for 23 ns; 
         
+        -- Test case 2: Change variable 2 (header=0010) to x1234
+        report("Sending xAB34");
+        send_20bit("0010" & x"AB34");
+
+        wait for 1 ns;
+        
+        -- Test case 2: Change variable 2 (header=0010) to x1234
+        report("Sending x1234");
+        send_20bit("0010" & x"1234");
+
+        wait for 10 ns;
+        
+        -- Test case 2: Change variable 2 (header=0010) to x1234
+        report("Sending x12CD");
+        send_20bit("0010" & x"12CD");
+        wait for 500 ns;
         test_complete <= true;
         report("Simulation done!");
         wait;

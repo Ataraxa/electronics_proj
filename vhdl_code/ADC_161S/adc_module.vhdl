@@ -8,7 +8,6 @@ use IEEE.STD_LOGIC_1164.ALL;
 entity ADC_161S_MODULE is 
 Generic(
     -- can decalre generic variables here
-    f_samp : integer := 2_000; 
     f_master_clock : integer := 12_000_000; -- 12 MHz on P7
     f_serial_clk : integer := 3_000_000
 );
@@ -36,11 +35,6 @@ architecture Behavioral of ADC_161S_MODULE is
     -- ADS signals
     signal data_buffer : std_logic_vector(15 downto 0) := (others => '0');
 
-    -- Clock dividers
-    -- constant CS_divider : integer := f_master_clock/f_samp;
-    -- signal CS_counter : integer range 0 to CS_divider-1 := 0;
-    -- signal CS_clock_internal : std_logic := '1';
-
     constant sclk_divider : integer := f_master_clock/f_serial_clk;
     signal sclk_counter : integer range 0 to sclk_divider-1 := 0;
     signal sclk_internal : std_logic := '1'; 
@@ -66,9 +60,9 @@ architecture Behavioral of ADC_161S_MODULE is
     -- chip_select <= CS_clock_internal;
     chip_select <= cs_clock_external;
 
-    SER_CLOCK : process(master_clock, CS_clock_internal)
+    SER_CLOCK : process(master_clock)
         begin
-        if (CS_clock_internal = '1') then 
+        if (cs_clock_external = '1') then 
             -- do nothing 
             sclk_internal <= '1';
         elsif rising_edge(master_clock) then
@@ -83,11 +77,13 @@ architecture Behavioral of ADC_161S_MODULE is
     serial_clock <= sclk_internal;
 
     ADC_PROCESS : process(sclk_internal)
+    variable sync_start : std_logic_vector(1 downto 0) := "ZZ";
     begin 
-    if falling_edge(sclk_internal) then 
+    if rising_edge(sclk_internal) then 
         data_out_valid_flag <= '0';
+        sync_start := sync_start(1) & data_in;
 
-        if data_in_counter = 0 and data_in = '0' then
+        if data_in_counter = 0 and sync_start = "Z0" then
             is_receiving <= '1';
             data_in_counter <= data_in_counter + 1;
         elsif is_receiving = '1' then 
