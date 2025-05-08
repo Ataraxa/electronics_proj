@@ -21,7 +21,10 @@ entity TOP_LEVEL is
         usb_input_valid : in std_logic := '0';
         
         --- System ports
-        master_clock : in std_logic
+        master_clock : in std_logic;
+
+        -- Debug ports
+        busy_stim : out std_logic
     );
 end TOP_LEVEL;
 
@@ -53,7 +56,10 @@ architecture Structure of TOP_LEVEL is
 
             -- Base station ports
             data_received => data_ftdi2core,
-            data2consume => data_valid_ftdi2core
+            data2consume => data_valid_ftdi2core,
+
+            -- Debug ports
+            busy_stim => busy_stim
         );
 
     ADC: entity work.ADC_161S_MODULE

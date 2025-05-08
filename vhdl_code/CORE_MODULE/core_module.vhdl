@@ -58,7 +58,10 @@ Port(
 
     -- FTDI interface ports
     data_received : in std_logic_vector(19 downto 0);
-    data2consume : in std_logic
+    data2consume : in std_logic;
+
+    -- DEBUG port [TODO: remove]
+    busy_stim : out std_logic := '0'
 );
 end CORE_MODULE;
 
@@ -74,7 +77,6 @@ architecture Behavioral of CORE_MODULE is
     signal dac_master_clock_cycles : integer range 0 to 262_000;
     
     -- Signals related to DAC 
-    -- signal is_stimulating : std_logic := '0';
     signal delay_cycles : integer range 0 to 100 := 50;
     signal delay_counter : integer range 0 to 100 := 0;
     signal should_delay : std_logic := '0';
@@ -86,14 +88,13 @@ architecture Behavioral of CORE_MODULE is
     signal dbs_state : stimulation;
     signal state_counter : integer range 0 to 7000;
     signal high_dac : std_logic_vector(15 downto 0) := "1001100110011001"; -- +1V
-    signal low_dac : std_logic_vector(15 downto 0) := "0110011001100110";
+    signal low_dac : std_logic_vector(15 downto 0) := "0110011001100110"; -- -1V
     signal null_dac : std_logic_vector(15 downto 0) := "1000000000000000";
     signal high_time : integer range 0 to 7000 := 1200; -- 100 µs
     signal low_time : integer range 0 to 7000 := 1200; -- 100 µs
     signal inter_pulse_time : integer range 0 to 7000 := 240; -- 20 µs
     signal recovery_time : integer range 0 to 7000 := 240;
     signal stim_f : integer range 1 to 250 := 130; -- in Hertz
-    -- signal debug_state : integer range 0 to 10;
 
     -- Signal related to input data reading and reprogrammation
     signal reset : std_logic := '0';
@@ -108,6 +109,9 @@ architecture Behavioral of CORE_MODULE is
     signal phase_delay_cycles : integer range 0 to 10_000_000 := 10_000; 
     signal trigger_time_counter : integer  range 0 to 10_000_00 := 0;
     signal trigger_time_cycles : integer range 0 to 10_000_000 := 10_000;
+
+    -- DEBUG Signals [TODO: remove before flashing]
+    -- signal busy_stim : std_logic := '0';
 
     begin 
 
@@ -176,9 +180,11 @@ architecture Behavioral of CORE_MODULE is
             if (is_stimulating = '1') and (on_off_state = '1') then 
                 case dbs_state is 
                     when high => 
+                        busy_stim <= '1';    
                         if (state_counter = high_time) then
                             state_counter <= 0;
                             dbs_state <= inter_pulse;
+                            data_dac_valid <= '0';
                         else 
                             data_dac <= high_dac;
                             data_dac_valid <= '1';
@@ -194,6 +200,7 @@ architecture Behavioral of CORE_MODULE is
                         if (state_counter = inter_pulse_time) then 
                             state_counter <= 0;
                             dbs_state <= low;
+                            data_dac_valid <= '0';
                         else 
                             data_dac <= null_dac;
                             data_dac_valid <= '1';
@@ -204,6 +211,7 @@ architecture Behavioral of CORE_MODULE is
                         if (state_counter = low_time) then 
                             state_counter <= 0;
                             dbs_state <= recovery;
+                            data_dac_valid <= '0';
                         else 
                             data_dac <= low_dac;
                             data_dac_valid <= '1';
@@ -215,6 +223,8 @@ architecture Behavioral of CORE_MODULE is
                             state_counter <= 0;
                             dbs_state <= waiting;
                             is_stimulating := '0';
+                            data_dac_valid <= '0';
+                            busy_stim <= '0';
                         else 
                             data_dac <= null_dac;
                             data_dac_valid <= '1';
@@ -223,10 +233,12 @@ architecture Behavioral of CORE_MODULE is
 
                     when waiting =>
                         dbs_state <= high;
+                        -- data_dac_valid <= '0';
                 end case;
             else
                 data_dac <= null_dac;
                 dbs_state <= waiting;
+                data_dac_valid <= '0';
             end if;
         end if;
     end process PULSE_GEN;

@@ -22,7 +22,7 @@ initial_samples = (
 # Main loop to optimise the stimulation frequency
 while !should_stop
     # Fit a GP to data
-
+    pred
     # Acqusition function 
 
     # Evaluate fitness of new x

@@ -18,7 +18,10 @@ echo "Compiling TOP LEVEL module..."
 ghdl -a dbs_toplvl.vhdl
 ghdl -e TOP_LEVEL
 ghdl -r TOP_LEVEL
-echo "No error!"
+echo "Finished compiling modules:"
+
+echo "Compiling utilies..."
+ghdl -a --work=work ADC_161S/utils.vhdl
 
 echo "Compiling TOP LEVEL testbench file..." 
 ghdl -a --work=work dbs_toplvl_testbench.vhdl && \

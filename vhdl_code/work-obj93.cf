@@ -1,19 +1,22 @@
 v 4
-file . "DAC_8831/dac_module.vhdl" "e067abe1d0d4da3c0a1eaf779572300429c9ed88" "20250507163441.886":
-  entity dac_8831_module at 73( 2367) + 0 on 1005;
-  architecture behavioral of dac_8831_module at 93( 2830) + 0 on 1006;
-file . "CORE_MODULE/core_module.vhdl" "163286358e4e182be05ef7ae75f0c83c96ca0004" "20250507163441.662":
-  entity core_module at 34( 1339) + 0 on 1001;
-  architecture behavioral of core_module at 65( 2125) + 0 on 1002;
-file . "dbs_toplvl.vhdl" "982a9b2da8d3bc7e408a9cf5719f58c4aad4d227" "20250507163442.107":
-  entity top_level at 1( 0) + 0 on 1009;
-  architecture structure of top_level at 28( 809) + 0 on 1010;
-file . "ADC_161S/adc_module.vhdl" "bf9056db931eb3664ec9cbb5e35cb4e92489b997" "20250507163441.790":
-  entity adc_161s_module at 5( 210) + 0 on 1003;
-  architecture behavioral of adc_161s_module at 30( 882) + 0 on 1004;
-file . "FTDI_2232/ftdi_module.vhdl" "93ab90ca58a80b1d64dd044cff3bc13fddf3c958" "20250507163441.980":
-  entity ftdi_2232_rx at 1( 0) + 0 on 1007;
-  architecture behaviour of ftdi_2232_rx at 19( 451) + 0 on 1008;
-file . "dbs_toplvl_testbench.vhdl" "cb0e8eafb47253aacc82446ff061e01a339d9b90" "20250507163442.470":
-  entity fpga_toplvl_testbench at 1( 0) + 0 on 1011;
-  architecture testbench_arch of fpga_toplvl_testbench at 8( 145) + 0 on 1012;
+file . "DAC_8831/dac_module.vhdl" "8517bd0f1ddd59a74df52003889a64e83caf3b75" "20250508143814.161":
+  entity dac_8831_module at 1( 0) + 0 on 1295;
+  architecture behavioral of dac_8831_module at 21( 463) + 0 on 1296;
+file . "CORE_MODULE/core_module.vhdl" "ba96ae24864bf20b65fcc8874c0ea3f91646cf64" "20250508143813.912":
+  entity core_module at 34( 1339) + 0 on 1291;
+  architecture behavioral of core_module at 68( 2200) + 0 on 1292;
+file . "dbs_toplvl.vhdl" "97090cbb2a6a536cf03ddf8449db5fd094be5a9b" "20250508143814.358":
+  entity top_level at 1( 0) + 0 on 1299;
+  architecture structure of top_level at 31( 871) + 0 on 1300;
+file . "ADC_161S/adc_module.vhdl" "bf9056db931eb3664ec9cbb5e35cb4e92489b997" "20250508143814.024":
+  entity adc_161s_module at 5( 210) + 0 on 1293;
+  architecture behavioral of adc_161s_module at 30( 882) + 0 on 1294;
+file . "FTDI_2232/ftdi_module.vhdl" "93ab90ca58a80b1d64dd044cff3bc13fddf3c958" "20250508143814.254":
+  entity ftdi_2232_rx at 1( 0) + 0 on 1297;
+  architecture behaviour of ftdi_2232_rx at 19( 451) + 0 on 1298;
+file . "dbs_toplvl_testbench.vhdl" "2482a2db0e7b4c525a546b6a1efff875f3490085" "20250508143814.861":
+  entity fpga_toplvl_testbench at 1( 0) + 0 on 1303;
+  architecture testbench_arch of fpga_toplvl_testbench at 9( 166) + 0 on 1304;
+file . "ADC_161S/utils.vhdl" "10fa95e69080e26378464a22a8b5e1e7a7c81fac" "20250508143814.762":
+  package utils at 1( 0) + 0 on 1301 body;
+  package body utils at 8( 152) + 0 on 1302;
